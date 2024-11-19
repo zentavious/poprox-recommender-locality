@@ -23,11 +23,14 @@ def extract_locality_topics(article: Article) -> set[str]:
 
 
 def extract_locality_codes(article: Article) -> set[str]:
-    if "raw_data" in article and "subject" in article.raw_data:
-        article_codes = set([sub.code for sub in article.raw_data.subject if sub.code and len(sub.code) == 1])
-        locality_codes = ["a", "i", "w"]
-        return article_codes.intersection(locality_codes)
-    return []
+    article_topics = set([mention.entity.name for mention in article.mentions])
+    locality_codes = ["a", "i", "w"]
+    return article_topics.intersection(locality_codes)
+    # if "raw_data" in article and "subject" in article.raw_data:
+    #     article_codes = set([sub.code for sub in article.raw_data.subject if sub.code and len(sub.code) == 1])
+    #     locality_codes = ["a", "i", "w"]
+    #     return article_codes.intersection(locality_codes)
+    # return []
 
 
 def extract_locality(article: Article) -> list[str]:

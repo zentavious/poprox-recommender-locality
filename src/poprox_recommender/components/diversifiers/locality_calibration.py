@@ -10,11 +10,16 @@ from sklearn.metrics.pairwise import cosine_similarity
 from poprox_concepts import Article, ArticleSet, InterestProfile
 from poprox_recommender.components.diversifiers.calibration import compute_kl_divergence
 from poprox_recommender.lkpipeline import Component
-from poprox_recommender.topics import extract_general_topics, extract_locality, normalized_category_count
+from poprox_recommender.topics import (
+    extract_general_topics,
+    extract_locality,
+    extract_locality_codes,
+    normalized_category_count,
+)
 
 
 class LocalityCalibrator(Component):
-    def __init__(self, theta_local: float = 0.1, theta_topic: float = 0.1, num_slots=10):
+    def __init__(self, theta_local: float = 0.1, theta_topic: float = 0.1, num_slots=10, use_loc_codes: bool = False):
         """
         TODOs: If set different theta_topic and theta_local values for different users,
         then can save them in interest_profile
@@ -22,6 +27,10 @@ class LocalityCalibrator(Component):
         self.theta_local = theta_local
         self.theta_topic = theta_topic
         self.num_slots = num_slots
+        if use_loc_codes:
+            self.loc_func = extract_locality_codes
+        else:
+            self.loc_func = extract_locality
 
     def __call__(self, candidate_articles: ArticleSet, interest_profile: InterestProfile) -> ArticleSet:
         normalized_topic_prefs = self.compute_topic_prefs(interest_profile)
@@ -57,7 +66,7 @@ class LocalityCalibrator(Component):
 
     def add_article_to_localities(self, rec_localities, article):
         rec_localities = rec_localities.copy()
-        localities = extract_locality(article)
+        localities = self.loc_func(article)
         for local in localities:
             rec_localities[local] = rec_localities[local] + 1
         return rec_localities
@@ -123,7 +132,7 @@ class LocalityCalibrator(Component):
         candidate_articles = candidate_articles.articles
 
         for article in candidate_articles:
-            candidate_locality = extract_locality(article) or set()
+            candidate_locality = self.loc_func(article) or set()
             for locality in candidate_locality:
                 locality_preferences[locality] += 1
 

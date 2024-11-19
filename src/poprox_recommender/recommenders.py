@@ -91,6 +91,7 @@ def build_pipelines(num_slots: int, device: str) -> dict[str, Pipeline]:
     mmr = MMRDiversifier(num_slots=num_slots)
     pfar = PFARDiversifier(num_slots=num_slots)
     locality_calibrator = LocalityCalibrator(num_slots=num_slots)
+    locality_code_calibrator = LocalityCalibrator(num_slots=num_slots, use_loc_codes=True)
     topic_calibrator = TopicCalibrator(num_slots=num_slots)
     sampler = SoftmaxSampler(num_slots=num_slots, temperature=30.0)
 
@@ -132,7 +133,15 @@ def build_pipelines(num_slots: int, device: str) -> dict[str, Pipeline]:
         user_embedder=user_embedder,
         ranker=locality_calibrator,
         num_slots=num_slots,
-    )  #
+    )
+
+    locality_code_cali_pipe = build_pipeline(
+        "NRMS+LocalityCode+Calibration",
+        article_embedder=article_embedder,
+        user_embedder=user_embedder,
+        ranker=locality_code_calibrator,
+        num_slots=num_slots,
+    )
 
     softmax_pipe = build_pipeline(
         "NRMS+Softmax",
@@ -148,6 +157,7 @@ def build_pipelines(num_slots: int, device: str) -> dict[str, Pipeline]:
         "pfar": pfar_pipe,
         "topic-cali": topic_cali_pipe,
         "locality-cali": locality_cali_pipe,
+        "locality-code-cali": locality_code_cali_pipe,
         "softmax": softmax_pipe,
     }
 
