@@ -45,7 +45,6 @@ from poprox_recommender.logging_config import setup_logging
 from poprox_recommender.recommenders import recommendation_pipelines
 
 logger = logging.getLogger("poprox_recommender.evaluation.evaluate")
-
 # long-term TODO:
 # - support other MIND data (test?)
 # - support our data
@@ -73,6 +72,7 @@ def extract_recs(
                 "stage": "final",
                 "item": [str(a.article_id) for a in recs.articles],
                 "rank": np.arange(len(recs.articles), dtype=np.int16) + 1,
+                "treatment": False,
             }
         )
     ]
@@ -87,6 +87,7 @@ def extract_recs(
                     "stage": "ranked",
                     "item": [str(a.article_id) for a in ranked.articles],
                     "rank": np.arange(len(ranked.articles), dtype=np.int16) + 1,
+                    "treatment": False,
                 }
             )
         )
@@ -101,6 +102,7 @@ def extract_recs(
                     "stage": "reranked",
                     "item": [str(a.article_id) for a in reranked.articles],
                     "rank": np.arange(len(reranked.articles), dtype=np.int16) + 1,
+                    "treatment": reranked.treatment_flags,  # type: ignore
                 }
             )
         )
@@ -140,6 +142,8 @@ def generate_user_recs(data: Data, pipe_names: list[str] | None = None, n_users:
                 "candidate": ArticleSet(articles=request.todays_articles),
                 "clicked": ArticleSet(articles=request.past_articles),
                 "profile": request.interest_profile,
+                "theta_topic": 0.2,
+                "theta_locality": 0.2,
             }
             for name, pipe in pipelines.items():
                 try:
