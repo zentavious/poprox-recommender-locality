@@ -8,9 +8,13 @@ from poprox_recommender.lkpipeline import Component
 from poprox_recommender.topics import extract_general_topics, extract_locality, normalized_category_count
 
 # Only uncomment this in offline theta value exploration
+<<<<<<< HEAD
 # KL_VALUE_PATH = (
 #     "C:/Users/Zenta_t2ma3ok/Documents/POPROX/poprox-recommender-locality/src/outputs/theta_k1_values_11-17.txt"
 # )
+=======
+# KL_VALUE_PATH = '/home/sun00587/research/News_Locality_Polarization/poprox-recommender-locality/outputs/theta_kl_values_11-17.txt'  # noqa: E501
+>>>>>>> 2c587e9 (ruff formatting)
 
 
 class LocalityCalibrator(Component):
