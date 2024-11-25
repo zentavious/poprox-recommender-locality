@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import torch
 import numpy as np
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
@@ -9,7 +10,21 @@ from poprox_concepts import Article, ArticleSet
 from poprox_recommender.lkpipeline import Component
 from poprox_recommender.topics import extract_general_topics
 
+from rouge_score import rouge_scorer
+from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
+
+# TODO: discuss if we need to unify all the language model usages in this project
+
 model = SentenceTransformer("all-MiniLM-L6-v2")
+# Define the nli model
+nli_model = pipeline("zero-shot-classification", model="facebook/bart-large-mnli")
+nli_labels=["entailment", "neutral", "contradiction"]
+
+# Load HateXplain tokenizer and model
+model_name = "Hate-speech-CNERG/dehatebert-mono-english"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+toxiticy_model = AutoModelForSequenceClassification.from_pretrained(model_name)
+toxiticy_labels = ["normal", "offensive", "hatespeech"]
 
 client = OpenAI(
     api_key="Put your key here",
@@ -31,6 +46,31 @@ class ContextGenerator(Component):
             article.subhead = generated_subhead
 
         return recommended
+
+def offline_metric_calculation(original_subhead, generated_subhead, context):
+
+    # ROGUE metric to measure the original subhead information capture in the newly generated subhead
+    r_scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
+    rogue_score = r_scorer.score(original_subhead, generated_subhead)['rougeL']
+
+    # NLI metric to measure the personalization context reference in the newly generated subhead
+    # nli results will capture three scores: entailment, neutrality, contraction
+    nli_result = nli_model(generated_subhead, candidate_labels=nli_labels, hypothesis_template=f"This is about {context}.")
+
+    # Toxicity metric to measure the safety of generated subhead
+    tokens = tokenizer([generated_subhead], padding=True, truncation=True, return_tensors="pt")
+    with torch.no_grad():
+        res = toxiticy_model(**tokens)
+    logits = res.logits
+    probabilities = torch.nn.functional.softmax(logits, dim=-1).cpu().numpy()
+
+    # Get the label with the highest probability
+    predictions = [toxiticy_labels[np.argmax(prob)] for prob in probabilities]
+    scores = [np.max(prob) for prob in probabilities]
+    toxicity_label = [{"label": pred, "confidence": score} for  pred, score in zip(predictions, scores)]
+
+    # TODO: design some threshold to check the three scores for quality control
+    return rogue_score, nli_result['scores'], toxicity_label
 
 
 def generated_context(
