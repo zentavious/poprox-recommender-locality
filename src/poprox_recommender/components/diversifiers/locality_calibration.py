@@ -25,6 +25,8 @@ class LocalityCalibrator(Component):
         self,
         candidate_articles: ArticleSet,
         interest_profile: InterestProfile,
+        theta_topic: float,
+        theta_locality: float,
     ) -> ArticleSet:
         normalized_topic_prefs = self.compute_topic_prefs(interest_profile)
         normalized_locality_prefs = self.compute_local_prefs(candidate_articles)
@@ -36,7 +38,7 @@ class LocalityCalibrator(Component):
 
         article_scores = article_scores.cpu().detach().numpy()
 
-        article_indices, final_calibrations = self.calibration(
+        article_indices, topic_only_article_indices, final_calibrations = self.calibration(
             article_scores,
             candidate_articles.articles,
             normalized_topic_prefs,
@@ -51,9 +53,13 @@ class LocalityCalibrator(Component):
         # with open(KL_VALUE_PATH, 'a') as file:
         #     file.write('{}_top_{}_loc_{},{},{}\n'.format(str(interest_profile.profile_id), theta_topic, theta_locality, final_calibrations[0], final_calibrations[1]))
 
-        return ArticleSet(
+        article_set = ArticleSet(
             articles=[candidate_articles.articles[idx] for idx in article_indices]
         )  # all selected articles
+
+        article_set.treatment_flags = [index not in topic_only_article_indices for index in article_indices]
+
+        return article_set
 
     def add_article_to_categories(self, rec_topics, article):
         rec_topics = rec_topics.copy()
@@ -86,15 +92,19 @@ class LocalityCalibrator(Component):
         # R is all candidates (not selected yet)
 
         recommendations = []  # final recommendation (topk index)
+        topic_only_recommendations = []
 
         topic_categories = defaultdict(int)
+        topic_only_categories = defaultdict(int)
         local_categories = defaultdict(int)
 
         final_calibrations = [None, None]
 
         for _ in range(topk):
             candidate = None  # next item
+            topic_candidate = None
             best_candidate_score = float("-inf")
+            best_topic_candidate_score = float("-inf")
 
             for article_idx, article_score in enumerate(relevance_scores):  # iterate R for next item
                 if article_idx in recommendations:
@@ -103,11 +113,15 @@ class LocalityCalibrator(Component):
                 normalized_candidate_topics = self.normalized_categories_with_candidate(
                     topic_categories, articles[article_idx]
                 )
+                normalized_topic_candidate_topics = self.normalized_categories_with_candidate(
+                    topic_only_categories, articles[article_idx]
+                )
                 normalized_candidate_locality = self.normalized_localities_with_candidate(
                     local_categories, articles[article_idx]
                 )
 
                 calibration_topic = compute_kl_divergence(topic_preferences, normalized_candidate_topics)
+                calibration_topic_only = compute_kl_divergence(topic_preferences, normalized_topic_candidate_topics)
                 calibration_local = compute_kl_divergence(locality_preferences, normalized_candidate_locality)
 
                 # TODO or other MOE
@@ -116,17 +130,29 @@ class LocalityCalibrator(Component):
                     - (theta_topic * calibration_topic)
                     - (theta_local * calibration_local)
                 )
+                adjusted_topic_candidate_score = (1 - theta_local - theta_topic) * article_score - (
+                    theta_topic + theta_local * calibration_topic_only
+                )
+
                 if adjusted_candidate_score > best_candidate_score:
                     best_candidate_score = adjusted_candidate_score
                     candidate = article_idx
                     final_calibrations = [calibration_topic, calibration_local]
+
+                if adjusted_topic_candidate_score > best_topic_candidate_score:
+                    best_topic_candidate_score = adjusted_topic_candidate_score
+                    topic_candidate = article_idx
 
             if candidate is not None:
                 recommendations.append(candidate)
                 topic_categories = self.add_article_to_categories(topic_categories, articles[candidate])
                 local_categories = self.add_article_to_localities(local_categories, articles[candidate])
 
-        return recommendations, final_calibrations
+            if topic_candidate is not None:
+                topic_only_recommendations.append(topic_candidate)
+                topic_only_categories = self.add_article_to_categories(topic_only_categories, articles[topic_candidate])
+
+        return recommendations, topic_only_recommendations, final_calibrations
 
     def compute_local_prefs(self, candidate_articles: ArticleSet):
         locality_preferences: dict[str, int] = defaultdict(int)
