@@ -18819,8 +18819,13 @@ packages:
   requires_python: '>=3.10'
 - kind: pypi
   name: progress-api
+<<<<<<< HEAD
   version: 0.1.1.dev2+g7147712
   url: git+https://github.com/lenskit/progress-api@7147712bac9fb6991b68d5ffd7819681fdfa3592
+=======
+  version: 0.1.0
+  url: git+https://github.com/lenskit/progress-api@62a3cff41e5c88cc0193ca2a4d4b99494e9bb8ec
+>>>>>>> 962e1330aa2f87a88969537080b9bdf17d79ff9e
   requires_dist:
   - setuptools>=64 ; extra == 'dev'
   - setuptools-scm>=8 ; extra == 'dev'
