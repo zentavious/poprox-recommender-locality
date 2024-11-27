@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 
 import numpy as np
 from openai import OpenAI
@@ -9,11 +10,16 @@ from poprox_concepts import Article, ArticleSet
 from poprox_recommender.lkpipeline import Component
 from poprox_recommender.topics import extract_general_topics
 
+logger = logging.getLogger("poprox_recommender.components.generators.context")
+
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-client = OpenAI(
-    api_key="Put your key here",
-)
+dev_mode = True
+
+if not dev_mode:
+    client = OpenAI(
+        api_key="Put your key here",
+    )
 
 
 class ContextGenerator(Component):
@@ -24,6 +30,10 @@ class ContextGenerator(Component):
         self.other_filter = other_filter
 
     def __call__(self, clicked: ArticleSet, recommended: ArticleSet) -> ArticleSet:
+        if dev_mode:
+            logger.debug("Skipping GPT call in dev mode.")
+            return recommended
+
         for article in recommended.articles:
             generated_subhead = generated_context(
                 article, clicked, self.time_decay, self.topk_similar, self.other_filter

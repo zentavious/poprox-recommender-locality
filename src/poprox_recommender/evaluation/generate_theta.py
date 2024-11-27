@@ -105,6 +105,10 @@ def extract_recs(
                     "item": [str(a.article_id) for a in reranked.articles],
                     "rank": np.arange(len(reranked.articles), dtype=np.int16) + 1,
                     "treatment": reranked.treatment_flags,  # type: ignore
+                    "theta_topic": reranked.k1_values["theta_topic"],  # type: ignore
+                    "theta_locality": reranked.k1_values["theta_locality"],  # type: ignore
+                    "k1_topic": reranked.k1_values["k1_topic"],  # type: ignore
+                    "k1_locality": reranked.k1_values["k1_locality"],  # type: ignore
                 }
             )
         )
@@ -172,7 +176,7 @@ def generate_user_recs(
 
 
 @hydra.main(
-    config_path="/home/sun00587/research/News_Locality_Polarization/poprox-recommender-locality/src/",
+    config_path="C:/Users/Zenta_t2ma3ok/Documents/POPROX/poprox-recommender-locality/src/",
     config_name="config",
     version_base="1.1",
 )
@@ -181,7 +185,9 @@ def main(cfg: DictConfig) -> None:
         PoproxData(cfg.data_path), cfg.pipelines, theta_topic=cfg.theta_topic, theta_locality=cfg.theta_locality
     )
 
-    print(f"Starting run with theta_topic={round(cfg.theta_topic, 2)}, theta_locality={round(cfg.theta_locality, 2)}")
+    logger.info(
+        f"Starting run with theta_topic={round(cfg.theta_topic, 2)}, theta_locality={round(cfg.theta_locality, 2)}"
+    )
     all_recs = pd.concat(user_recs, ignore_index=True)
     out_fn = "{}top_{}_loc_{}.parquet".format(cfg.output_dir, round(cfg.theta_topic, 2), round(cfg.theta_locality, 2))
     logger.info("saving recommendations to %s", out_fn)
@@ -189,4 +195,4 @@ def main(cfg: DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main()  # type: ignore
