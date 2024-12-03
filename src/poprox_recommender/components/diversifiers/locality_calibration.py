@@ -7,19 +7,6 @@ from poprox_recommender.components.diversifiers.calibration import compute_kl_di
 from poprox_recommender.lkpipeline import Component
 from poprox_recommender.topics import extract_general_topics, extract_locality, normalized_category_count
 
-# Only uncomment this in offline theta value exploration
-<<<<<<< HEAD
-<<<<<<< HEAD
-# KL_VALUE_PATH = (
-#     "C:/Users/Zenta_t2ma3ok/Documents/POPROX/poprox-recommender-locality/src/outputs/theta_k1_values_11-17.txt"
-# )
-=======
-# KL_VALUE_PATH = '/home/sun00587/research/News_Locality_Polarization/poprox-recommender-locality/outputs/theta_kl_values_11-17.txt'  # noqa: E501
->>>>>>> 2c587e9 (ruff formatting)
-=======
-# KL_VALUE_PATH = '/home/sun00587/research/News_Locality_Polarization/poprox-recommender-locality/outputs/theta_kl_values_11-17.txt'  # noqa: E501
->>>>>>> 962e1330aa2f87a88969537080b9bdf17d79ff9e
-
 
 class LocalityCalibrator(Component):
     def __init__(self, theta_local: float = 0.1, theta_topic: float = 0.1, num_slots=10):
@@ -58,38 +45,17 @@ class LocalityCalibrator(Component):
             topk=self.num_slots,
         )
 
-        # Save computed kl divergence for topic and locality
-        # Only uncomment this in offline theta value exploration
-<<<<<<< HEAD
-        # with open(KL_VALUE_PATH, "a") as file:
-        #     file.write(
-        #         "{}_top_{}_loc_{},{},{}\n".format(
-        #             str(interest_profile.profile_id),
-        #             theta_topic,
-        #             theta_locality,
-        #             final_calibrations[0],
-        #             final_calibrations[1],
-        #         )
-        #     )
-=======
-        # with open(KL_VALUE_PATH, 'a') as file:
-        #     file.write('{}_top_{}_loc_{},{},{}\n'.format(str(interest_profile.profile_id), theta_topic, theta_locality, final_calibrations[0], final_calibrations[1]))  # noqa: E501
->>>>>>> 962e1330aa2f87a88969537080b9bdf17d79ff9e
-
         article_set = ArticleSet(
             articles=[candidate_articles.articles[idx] for idx in article_indices]
         )  # all selected articles
 
         article_set.treatment_flags = [index not in topic_only_article_indices for index in article_indices]
-<<<<<<< HEAD
         article_set.k1_values = {
             "theta_topic": theta_topic,
             "theta_locality": theta_locality,
             "k1_topic": final_calibrations[0],
             "k1_locality": final_calibrations[1],
         }
-=======
->>>>>>> 962e1330aa2f87a88969537080b9bdf17d79ff9e
 
         return article_set
 
