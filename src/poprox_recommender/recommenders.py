@@ -168,6 +168,10 @@ def build_pipeline(name, article_embedder, user_embedder, ranker, num_slots):
     clicked = pipeline.create_input("clicked", ArticleSet)
     profile = pipeline.create_input("profile", InterestProfile)
 
+    # locality-calibration specific inputs
+    theta_topic = pipeline.create_input("theta_topic", float)
+    theta_locality = pipeline.create_input("theta_locality", float)
+    
     # Compute embeddings
     e_cand = pipeline.add_component("candidate-embedder", article_embedder, article_set=candidates)
     e_click = pipeline.add_component("history-embedder", article_embedder, article_set=clicked)

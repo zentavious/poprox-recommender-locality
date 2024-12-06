@@ -3,9 +3,10 @@ import logging
 
 from poprox_concepts import ArticleSet
 from poprox_concepts.api.recommendations import RecommendationRequest, RecommendationResponse
-from poprox_recommender.components.diversifiers.locality_calibration import generated_context
 from poprox_recommender.recommenders import select_articles
 from poprox_recommender.topics import user_topic_preference
+from poprox_recommender.components.diversifiers.locality_calibration import generated_context
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -48,7 +49,7 @@ def generate_recs(event, context):
     clicked_articles = list(
         filter(lambda a: a.article_id in set([c.article_id for c in click_history]), req.past_articles)
     )
-
+    
     clicked_articles = ArticleSet(articles=clicked_articles)
     profile.click_topic_counts = user_topic_preference(req.past_articles, profile.click_history)
 
@@ -59,20 +60,15 @@ def generate_recs(event, context):
         pipeline_params,
     )
 
-    text_generation = False  # TODO: move to parameter
-    time_decay = True  # TODO: move to parameter
-    topk_similar = 5  # TODO: move to parameter
-
-    if text_generation:
-        for article in outputs.default.articles:
-            if article.flag == 1: 
-                generated_subhead = generated_context(article, clicked_articles, time_decay, topk_similar)
-                article.subhead = generated_subhead
-
     logger.info("Constructing response...")
     resp_body = RecommendationResponse.model_validate(
         {"recommendations": {profile.profile_id: outputs.default.articles}, "recommender": outputs.meta.model_dump()}
     )
+    # TODO: add evaluation computation for recommendation 
+
+
+
+
 
     logger.info("Serializing response...")
     response = {"statusCode": 200, "body": resp_body.model_dump_json()}
