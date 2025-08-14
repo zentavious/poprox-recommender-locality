@@ -41,6 +41,8 @@ class PoproxData(EvalData):
             clicked_articles_df,
             clicked_mentions_df,
             interests_df,
+            experiment_df,
+            assignments_df,
         ) = load_poprox_frames(archive, start_date, end_date)
 
         self.newsletters_df = newsletters_df
@@ -58,6 +60,28 @@ class PoproxData(EvalData):
             logger.warning("clicked article data has non-unique index")
 
         self.interests_df = interests_df
+
+        calibration_group_ids = experiment_df.loc[(experiment_df["group_name"] == "calibration_treatment")][
+            "group_id"
+        ].unique()
+
+        # Step 2: Get profile_ids in that group
+        calibration_profile_ids = assignments_df.loc[assignments_df["group_id"].isin(calibration_group_ids)][
+            "profile_id"
+        ].unique()
+
+        logger.info("Downsampling to %d profiles in calibration group...", len(calibration_profile_ids))
+
+        # Step 3: Subset all relevant DataFrames
+        self.newsletters_df = newsletters_df[newsletters_df["profile_id"].isin(calibration_profile_ids)]
+        # self.clicks_df = clicks_df[clicks_df["profile_id"].isin(calibration_profile_ids)]
+        # self.clicked_mentions_df = clicked_mentions_df[
+        #     clicked_mentions_df["article_id"].isin(self.clicks_df["article_id"])
+        # ]
+        # self.clicked_articles_df = clicked_articles_df[
+        #     clicked_articles_df["article_id"].isin(self.clicks_df["article_id"])
+        # ]
+        # self.interests_df = interests_df[interests_df["account_id"].isin(calibration_profile_ids)]
 
         # Default to 1 for when iter_hyperparameters is never called
         self.num_hyperparameters = 1
@@ -183,25 +207,26 @@ class PoproxData(EvalData):
             profile_clicks_df = self.clicks_df.loc[self.clicks_df["profile_id"] == profile_id]
             logger.info(profile_clicks_df.columns)
             filtered_clicks_df = profile_clicks_df[profile_clicks_df["clicked_at"] < newsletter_created_at]
-            if len(filtered_clicks_df) == 0:
-                logger.warning(f"No clicks for profile {profile_id} before newsletter {newsletter_id}")
-                continue
+            # if len(filtered_clicks_df) == 0:
+            #     logger.warning(f"No clicks for profile {profile_id} before newsletter {newsletter_id}")
+            #     continue
 
             # Create Article and Click objects from dataframe rows
             clicks = []
             past_articles = []
-            for article_row in filtered_clicks_df.itertuples():
-                article = self.lookup_clicked_article(article_row.article_id)
-                if article:
-                    past_articles.append(article)
+            if len(filtered_clicks_df) > 0:
+                for article_row in filtered_clicks_df.itertuples():
+                    article = self.lookup_clicked_article(article_row.article_id)
+                    if article:
+                        past_articles.append(article)
 
-                    clicks.append(
-                        Click(
-                            article_id=article_row.article_id,
-                            newsletter_id=article_row.newsletter_id,
-                            timestamp=article_row.clicked_at,
+                        clicks.append(
+                            Click(
+                                article_id=article_row.article_id,
+                                newsletter_id=article_row.newsletter_id,
+                                timestamp=article_row.clicked_at,
+                            )
                         )
-                    )
 
             interests = self.interests_df.loc[self.interests_df["account_id"] == profile_id]
             topics = []
@@ -227,11 +252,14 @@ class PoproxData(EvalData):
             ].itertuples():
                 candidate_articles.append(self.lookup_candidate_article(article_row.article_id))
 
-            yield RecommendationRequestV2(
-                candidates=CandidateSet(articles=candidate_articles),
-                interacted=CandidateSet(articles=past_articles),
-                interest_profile=profile,
-                num_recs=TEST_REC_COUNT,  # Check to make sure None inputs are ok in the diversifier
+            yield (
+                RecommendationRequestV2(
+                    candidates=CandidateSet(articles=candidate_articles),
+                    interacted=CandidateSet(articles=past_articles),
+                    interest_profile=profile,
+                    num_recs=TEST_REC_COUNT,  # Check to make sure None inputs are ok in the diversifier
+                ),
+                newsletter_id,
             )
 
     def lookup_candidate_article(self, article_id: UUID):
@@ -246,6 +274,7 @@ class PoproxData(EvalData):
             return self.convert_row_to_article(article_row, mention_rows)
         except Exception as _:
             print(f"Did not find the clicked article with id {str(article_id)}")
+            print(f"Exception {_}")
             return None
 
     def convert_row_to_article(self, article_row, mention_rows):
@@ -277,7 +306,7 @@ def load_poprox_frames(archive: str = "POPROX", start_date: datetime | None = No
     data = project_root() / "data"
     logger.info("loading POPROX data from %s", archive)
 
-    newsletters_df = pd.read_parquet(data / "POPROX" / "newsletters.parquet")
+    newsletters_df = pd.read_parquet(data / archive / "newsletters.parquet")
     newsletters_df["created_at_date"] = pd.to_datetime(newsletters_df["created_at"])
 
     if start_date:
@@ -287,14 +316,17 @@ def load_poprox_frames(archive: str = "POPROX", start_date: datetime | None = No
         logger.info("loading newsleters before %s", end_date)
         newsletters_df = newsletters_df[newsletters_df["created_at_date"] < end_date]
 
-    articles_df = pd.read_parquet(data / "POPROX" / "articles.parquet")
-    mentions_df = pd.read_parquet(data / "POPROX" / "mentions.parquet")
+    articles_df = pd.read_parquet(data / archive / "candidate" / "articles.parquet")
+    mentions_df = pd.read_parquet(data / archive / "candidate" / "article_mentions.parquet")
 
-    clicks_df = pd.read_parquet(data / "POPROX" / "clicks.parquet")
-    clicked_articles_df = pd.read_parquet(data / "POPROX" / "clicked" / "articles.parquet")
-    clicked_mentions_df = pd.read_parquet(data / "POPROX" / "clicked" / "mentions.parquet")
+    clicks_df = pd.read_parquet(data / archive / "clicks.parquet")
+    clicked_articles_df = pd.read_parquet(data / archive / "clicked" / "articles.parquet")
+    clicked_mentions_df = pd.read_parquet(data / archive / "clicked" / "article_mentions.parquet")
 
-    interests_df = pd.read_parquet(data / "POPROX" / "interests.parquet")
+    interests_df = pd.read_parquet(data / archive / "interests.parquet")
+
+    experiment_df = pd.read_parquet(data / archive / "experiment.parquet")
+    assignments_df = pd.read_parquet(data / archive / "assignments.parquet")
 
     return (
         articles_df,
@@ -304,4 +336,6 @@ def load_poprox_frames(archive: str = "POPROX", start_date: datetime | None = No
         clicked_articles_df,
         clicked_mentions_df,
         interests_df,
+        experiment_df,
+        assignments_df,
     )
